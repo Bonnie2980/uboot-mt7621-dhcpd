@@ -8,6 +8,18 @@ echo "CROSS_COMPILE=${Toolchain}"
 echo "STAGING_DIR=${Toolchain%/toolchain-*}"
 cd $(dirname "$0")
 
+# Clean mt7621_build_defconfig before generating new one
+
+if [ -f "configs/mt7621_build_defconfig" ]; then
+	echo "Removing old mt7621_build_defconfig"
+	rm configs/mt7621_build_defconfig
+fi
+if [ -f "include/configs/mt7621-common.h" ]; then
+	# remove the reset button and system led related config in mt7621-common.h
+	echo "Removing old reset button and system led config in mt7621-common.h"
+	sed -i '/__CONFIG_MT7621_RESET_LED/,/#endif/d' include/configs/mt7621-common.h
+fi
+
 # arguments:
 # $1	string: flash type
 # $2	string: partition table
@@ -144,3 +156,14 @@ mkdir archive
 cat defconfig > archive/mt7621_defconfig
 mv u-boot-mt7621.bin archive/
 mv u-boot.img archive/
+
+# Clean mt7621_build_defconfig after building
+if [ -f "configs/mt7621_build_defconfig" ]; then
+	echo "Removing mt7621_build_defconfig"
+	rm configs/mt7621_build_defconfig
+fi
+if [ -f "include/configs/mt7621-common.h" ]; then
+	# remove the reset button and system led related config in mt7621-common.h
+	echo "Removing old reset button and system led config in mt7621-common.h"
+	sed -i '/__CONFIG_MT7621_RESET_LED/,/#endif/d' include/configs/mt7621-common.h
+fi
