@@ -7,7 +7,7 @@
 --sysled-pin 0
 --sysled2-pin 16
 --cpufreq 880
---ramfreq 1200
+--ramfreq 1066
 --ddrparam DDR3-512MiB
 --oldparam true
 --baudrate 115200
