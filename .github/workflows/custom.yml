@@ -7,7 +7,7 @@ on:
         description: 'Device Model'
         required: true
         type: string
-        default: 'ZTE_E8820S'
+        default: 'H3C_TX1801-Plus'
       flash:
         description: 'Flash Type'
         required: true
@@ -21,17 +21,17 @@ on:
         description: 'MTD Partitions'
         required: true
         type: string
-        default: '512k(u-boot),512k(u-boot-env),256k(factory),-(firmware)'
+        default: '512k(u-boot),512k(u-boot-env),512k(exp),512k(factory),-(firmware)'
       kernel_offset:
         description: 'Kernel Load Address'
         required: true
         type: string
-        default: '0x140000'
+        default: '0x200000'
       gpio_config:
         description: 'GPIO Config (format: reset_pin,sysled_pin)'
         required: true
         type: string
-        default: '18,3'
+        default: '13,15'
       cpufreq:
         description: 'CPU Frequency (400 - 1200)'
         required: true
@@ -75,11 +75,6 @@ on:
         - '57600'
         - '115200'
         default: '115200'
-      pub_release:
-        description: 'Publish to GitHub Release'
-        required: false
-        default: true
-        type: boolean
 
 jobs:
   build:
@@ -140,28 +135,3 @@ jobs:
             name="${filename%.*}"
             mv "$file" "uboot-mt7621/archive/${name}-${{ steps.timestamp.outputs.now }}.${extension}"
           done
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        if: ${{ inputs.pub_release }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          name: CUSTOM-${{ inputs.model }}-${{ steps.timestamp.outputs.now }}
-          body: |
-            - Commit: ${{ github.sha }}
-            - Build Time: ${{ steps.timestamp.outputs.now }} (UTC)
-            - ---
-            - Device Model: ${{ inputs.model }}
-            - Flash Type: ${{ inputs.flash }}
-            - MTD Partitions: ${{ inputs.mtdparts }}
-            - Kernel Load Address: ${{ inputs.kernel_offset }}
-            - Reset Button GPIO: ${{ steps.gpio.outputs.reset_pin }}
-            - Sysled GPIO: ${{ steps.gpio.outputs.sysled_pin }}
-            - CPU Frequency: ${{ inputs.cpufreq }} MHz
-            - DDR Frequency: ${{ inputs.ramfreq }} MHz
-            - DDR initialization parameters: ${{ inputs.ddrparam }}
-            - Use old DDR parameters: ${{ inputs.oldparam }}
-            - Baud Rate: ${{ inputs.baudrate }}
-          files: uboot-mt7621/archive/*
-          tag_name: ${{ inputs.model }}-${{ steps.timestamp.outputs.now }}
