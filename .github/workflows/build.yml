@@ -29,11 +29,6 @@ on:
         required: true
         type: boolean
         default: false
-      pub_release:
-        description: 'Publish to GitHub Release'
-        required: false
-        default: true
-        type: boolean
 
 jobs:
   build:
@@ -70,7 +65,7 @@ jobs:
 
       - name: Download OpenWrt toolchain
         run: |
-          wget -O - https://github.com/DragonBluep/uboot-mt7621/releases/download/20230517/openwrt-toolchain-ramips-mt7621_gcc-12.3.0_musl.Linux-x86_64.tar.xz \
+          wget -O - https://github.com/Bonnie2980/uboot-mt7621-dhcpd/releases/download/20260408/openwrt-toolchain-ramips-mt7621_gcc-12.3.0_musl.Linux-x86_64.tar.xz \
             | tar --xz -xf -
 
       - name: Compile
@@ -97,18 +92,3 @@ jobs:
             name="${filename%.*}"
             mv "$file" "uboot-mt7621/archive/${name}-${{ steps.timestamp.outputs.now }}.${extension}"
           done
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        if: ${{ inputs.pub_release }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          name: BOARD-${{ inputs.model }}-${{ steps.timestamp.outputs.now }}
-          body: |
-            - Commit: ${{ github.sha }}
-            - Build Time: ${{ steps.timestamp.outputs.now }} (UTC)
-            - ---
-            - Device: ${{ inputs.model }}
-          files: uboot-mt7621/archive/*
-          tag_name: ${{ inputs.model }}-${{ steps.timestamp.outputs.now }}

@@ -99,7 +99,7 @@ jobs:
 
       - name: Download OpenWrt toolchain
         run: |
-          wget -O - https://github.com/DragonBluep/uboot-mt7621/releases/download/20230517/openwrt-toolchain-ramips-mt7621_gcc-12.3.0_musl.Linux-x86_64.tar.xz \
+          wget -O - https://github.com/Bonnie2980/uboot-mt7621-dhcpd/releases/download/20260408/openwrt-toolchain-ramips-mt7621_gcc-12.3.0_musl.Linux-x86_64.tar.xz \
             | tar --xz -xf -
 
       - name: Parse GPIO config
