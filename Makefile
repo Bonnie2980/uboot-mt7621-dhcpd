@@ -1563,6 +1563,9 @@ spl/u-boot-spl.sfp: spl/u-boot-spl
 spl/boot.bin: spl/u-boot-spl
 	@:
 
+spl/u-boot-mt7621-nand-spl.img: spl/u-boot-spl
+	@:
+
 tpl/u-boot-tpl.bin: tools prepare \
 		$(if $(CONFIG_OF_SEPARATE)$(CONFIG_OF_EMBED)$(CONFIG_SPL_OF_PLATDATA),dts/dt.dtb)
 	$(Q)$(MAKE) obj=tpl -f $(srctree)/scripts/Makefile.spl all
@@ -1699,6 +1702,7 @@ distclean: mrproper
 		-o -name '*.pyc' \) \
 		-type f -print | xargs rm -f
 	@rm -f boards.cfg
+	rm -rf archive
 
 backup:
 	F=`basename $(srctree)` ; cd .. ; \

@@ -305,6 +305,17 @@ ul {
     color: #ef4444;
 }
 
+/*
+ * Register --percent as an animatable numeric property.
+ * Without @property, the browser cannot interpolate CSS custom
+ * properties and width changes jump rather than animate.
+ */
+@property --percent {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0;
+}
+
 .bar {
     height: 14px;
     width: 520px;
@@ -328,6 +339,8 @@ ul {
     text-align: right;
     white-space: nowrap;
     overflow: hidden;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: width;
 }
 
 #md5,

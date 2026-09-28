@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <linux/libfdt.h>
 #include <linux/ctype.h>
+#include <linux/kernel.h>
 #include <malloc.h>
 #include <asm/global_data.h>
 #ifdef CONFIG_MTD
@@ -881,6 +882,89 @@ static void backup_set_std_response(struct httpd_response *response,
 	response->info.content_type = "text/plain";
 }
 
+/*
+ * Read MTD data with automatic bad block skipping.
+ *
+ * For NAND flash, bad blocks scattered across the device will cause
+ * mtd_read() to fail.  This helper detects bad blocks, skips them, and
+ * fills the corresponding output region with 0xFF (erased state), so the
+ * caller always gets a contiguous byte stream of exactly the requested
+ * length (up to the device limit).
+ */
+static int failsafe_mtd_read_skip_bad(struct mtd_info *mtd, loff_t from,
+				       size_t want, u64 limit,
+				       size_t *retlen, u_char *buf)
+{
+	size_t total = 0;
+	loff_t off = from;
+	size_t left = want;
+	int ret;
+
+	*retlen = 0;
+
+	while (left && off < (loff_t)limit) {
+		loff_t blk_start;
+		size_t chunk;
+		size_t got = 0;
+
+		/* Check for bad block if the MTD layer supports it */
+		if (mtd_can_have_bb(mtd)) {
+			blk_start = off & ~((loff_t)mtd->erasesize - 1);
+
+			ret = mtd_block_isbad(mtd, blk_start);
+			if (ret > 0) {
+				/* Bad block: skip to next block, pad with 0xFF */
+				loff_t blk_end = blk_start + mtd->erasesize;
+				loff_t next = min_t(loff_t, blk_end, (loff_t)limit);
+				size_t fill;
+
+				fill = (size_t)(next - off);
+				if (fill > left)
+					fill = left;
+
+				memset(buf + total, 0xFF, fill);
+				total  += fill;
+				off    += fill;
+				left   -= fill;
+				continue;
+			}
+			/* ret == 0: good block, fall through to read */
+			/* ret < 0:  error checking block — try reading anyway */
+		}
+
+		/* Read at most one erase block at a time to stay aligned */
+		chunk = left;
+		if (mtd_can_have_bb(mtd)) {
+			loff_t blk_end = blk_start + mtd->erasesize;
+			chunk = min_t(size_t, chunk, (size_t)(blk_end - off));
+		}
+
+		/* Clamp to device limit */
+		if ((loff_t)(off + chunk) > (loff_t)limit)
+			chunk = (size_t)((loff_t)limit - off);
+
+		if (!chunk)
+			break;
+
+		ret = mtd_read(mtd, off, chunk, &got, buf + total);
+		if (ret || !got) {
+			/* Partial success: return what we already have */
+			if (total)
+				break;
+			if (ret)
+				return ret;
+			break;
+		}
+
+		total += got;
+		off   += got;
+		left  -= got;
+	}
+
+	*retlen = total;
+	return 0;
+}
+
 static struct backup_session *backup_alloc_session(void)
 {
 	struct backup_session *st;
@@ -889,7 +973,7 @@ static struct backup_session *backup_alloc_session(void)
 	if (!st)
 		return NULL;
 
-	st->buf_size = 4096;
+	st->buf_size = 64 * 1024;
 	st->buf = malloc(st->buf_size);
 	if (!st->buf) {
 		free(st);
@@ -1171,11 +1255,10 @@ void backup_handler(enum httpd_uri_handler_status status,
 			return;
 		}
 
-		want = st->buf_size;
-		if (want > (size_t)(st->end - st->cur))
-			want = (size_t)(st->end - st->cur);
+		want = (size_t)min_t(u64, (u64)st->buf_size, st->end - st->cur);
 
-		ret = mtd_read(st->mtd, st->cur, want, &retlen, st->buf);
+		ret = failsafe_mtd_read_skip_bad(st->mtd, st->cur, want,
+						  st->mtd->size, &retlen, st->buf);
 		if (ret || !retlen) {
 			response->status = HTTP_RESP_NONE;
 			return;

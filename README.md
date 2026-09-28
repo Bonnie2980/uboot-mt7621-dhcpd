@@ -10,7 +10,7 @@ Support functions and Features:
 
 - Failsafe Mode with Web Recovery Page
 - Support light/dark theme
-- I18n support (English/Chinese)
+- I18n support (English/Chinese/Russian)
 - Auto dhcpd server
 - Support Web upgrade U-Boot
 - Can boot Initramfs firmware in Web
@@ -82,6 +82,8 @@ wget -O - https://github.com/DragonBluep/uboot-mt7621/releases/download/20230517
   --baudrate 115200 \
   --yes
 ```
+
+> `--wps-pin` marks the GPIO pin number of the WPS button, and it will be used to enter TFTP download mode, alse toggle the `--sysled2-pin` if set.
 
 - build by board model name
 
