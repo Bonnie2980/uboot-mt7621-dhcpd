@@ -1,0 +1,15 @@
+--flash NAND
+--mtdparts "512k(u-boot),512k(config),512k(factory),512k(crash),-(firmware)"
+--model "SIM_AX1800T"
+--kernel-offset 0x180000
+--reset-pin 18
+--wps-pin 4
+--sysled-pin 6
+--sysled2-pin 8
+--sysled3-pin 7
+--cpufreq 880
+--ramfreq 1200
+--ddrparam DDR3-256MiB
+--oldparam false
+--baudrate 115200
+--yes
