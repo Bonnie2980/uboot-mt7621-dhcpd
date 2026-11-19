@@ -1,4 +1,4 @@
-name: Build customized u-boot from DragonBluep/uboot-mt7621
+name: Build customized u-boot
 
 on:
   workflow_dispatch:
@@ -15,22 +15,22 @@ on:
         description: 'MTD Partition Table'
         required: true
         type: string
-        default: '192k(u-boot),64k(u-boot-env),64k(factory),-(firmware)'
+        default: '512k(u-boot),512k(config),512k(factory),512k(crash),-(firmware)'
       kernel_offset:
         description: 'Kernel Load Address'
         required: true
         type: string
-        default: '0x50000'
+        default: '0x180000'
       reset_pin:
         description: 'Reset Button GPIO'
         required: true
         type: number
-        default: -1
+        default: 8
       sysled_pin:
         description: 'System LED GPIO'
         required: true
         type: number
-        default: -1
+        default: 3
       cpufreq:
         description: 'CPU Frequency (400 - 1200)'
         required: true
@@ -45,7 +45,7 @@ on:
           - '800'
           - '1066'
           - '1200'
-        default: '800'
+        default: '1200'
       ddrparam:
         description: 'Prefered DDR Init Parameters'
         required: true
@@ -60,6 +60,7 @@ on:
           - 'DDR3-256MiB'
           - 'DDR3-512MiB'
           - 'DDR3-128MiB-KGD'
+        default: 'DDR3-128MiB'
       oldparam:
         description: 'Use Old DDR Timing Parameters'
         required: true
@@ -72,6 +73,7 @@ on:
         options:
           - '57600'
           - '115200'
+        default: '115200'
 
 jobs:
   build:
@@ -101,6 +103,7 @@ jobs:
           mkdir -p toolchain
           wget -qO - https://github.com/DragonBluep/uboot-mt7621/releases/download/20230517/openwrt-toolchain-ramips-mt7621_gcc-12.3.0_musl.Linux-x86_64.tar.xz \
             | tar --xz -xf - -C toolchain
+          find toolchain -name 'mipsel-openwrt-linux-gcc'
 
       - name: Set old DDR timing parameters
         if: ${{ inputs.oldparam }}
@@ -110,11 +113,20 @@ jobs:
       - name: Compile
         working-directory: uboot-mt7621
         run: |
-          TOOLCHAIN_ROOT="${GITHUB_WORKSPACE}/toolchain/openwrt-toolchain-ramips-mt7621_gcc-12.3.0_musl.Linux-x86_64"
-          CROSS_BIN="$(find "$TOOLCHAIN_ROOT" -maxdepth 3 -type f -name 'mipsel-openwrt-linux-gcc' | head -n 1)"
-          export CROSS_COMPILE="${CROSS_BIN%gcc}"
-          export STAGING_DIR="$TOOLCHAIN_ROOT"
-          export PATH="$(dirname "$CROSS_BIN"):$PATH"
+          GCC_PATH="$(find "${GITHUB_WORKSPACE}/toolchain" -type f -name 'mipsel-openwrt-linux-gcc' | head -n 1)"
+          if [ -z "$GCC_PATH" ]; then
+            echo "Error: mipsel-openwrt-linux-gcc not found"
+            exit 1
+          fi
+
+          TOOLCHAIN_BIN_DIR="$(dirname "$GCC_PATH")"
+          export STAGING_DIR="$(dirname "$TOOLCHAIN_BIN_DIR")"
+          export CROSS_COMPILE="${TOOLCHAIN_BIN_DIR}/mipsel-openwrt-linux-"
+          export PATH="${TOOLCHAIN_BIN_DIR}:${PATH}"
+
+          echo "CROSS_COMPILE=$CROSS_COMPILE"
+          echo "STAGING_DIR=$STAGING_DIR"
+
           ./customize.sh '${{ inputs.flash }}' '${{ inputs.mtdparts }}' '${{ inputs.kernel_offset }}' '${{ inputs.reset_pin }}' \
             '${{ inputs.sysled_pin }}' '${{ inputs.cpufreq }}' '${{ inputs.ramfreq }}' '${{ inputs.ddrparam }}' '${{ inputs.baudrate }}'
 
