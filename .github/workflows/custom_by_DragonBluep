@@ -1,0 +1,128 @@
+name: Build customized u-boot from DragonBluep/uboot-mt7621
+
+on:
+  workflow_dispatch:
+    inputs:
+      flash:
+        description: 'Flash Type'
+        required: true
+        type: choice
+        options:
+          - 'NOR'
+          - 'NAND'
+          - 'NAND-NMBM'
+      mtdparts:
+        description: 'MTD Partition Table'
+        required: true
+        type: string
+        default: '192k(u-boot),64k(u-boot-env),64k(factory),-(firmware)'
+      kernel_offset:
+        description: 'Kernel Load Address'
+        required: true
+        type: string
+        default: '0x50000'
+      reset_pin:
+        description: 'Reset Button GPIO'
+        required: true
+        type: number
+        default: -1
+      sysled_pin:
+        description: 'System LED GPIO'
+        required: true
+        type: number
+        default: -1
+      cpufreq:
+        description: 'CPU Frequency (400 - 1200)'
+        required: true
+        type: number
+        default: '880'
+      ramfreq:
+        description: 'DRAM Frequency'
+        required: true
+        type: choice
+        options:
+          - '400'
+          - '800'
+          - '1066'
+          - '1200'
+        default: '800'
+      ddrparam:
+        description: 'Prefered DDR Init Parameters'
+        required: true
+        type: choice
+        options:
+          - 'DDR2-64MiB'
+          - 'DDR2-128MiB'
+          - 'DDR2-W9751G6KB-64MiB-1066MHz'
+          - 'DDR2-W971GG6KB25-128MiB-800MHz'
+          - 'DDR2-W971GG6KB18-128MiB-1066MHz'
+          - 'DDR3-128MiB'
+          - 'DDR3-256MiB'
+          - 'DDR3-512MiB'
+          - 'DDR3-128MiB-KGD'
+      oldparam:
+        description: 'Use Old DDR Timing Parameters'
+        required: true
+        type: boolean
+        default: 'false'
+      baudrate:
+        description: 'Baud Rate'
+        required: true
+        type: choice
+        options:
+          - '57600'
+          - '115200'
+
+jobs:
+  build:
+    name: Build MT7621 u-boot
+    # Pin 22.04: ubuntu-latest (24.04+) breaks Python 2.7 (C23 bool keywords)
+    # and no longer ships python2 packages needed by U-Boot 2018.09 pylibfdt.
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Clone DragonBluep uboot-mt7621 source
+        run: |
+          rm -rf uboot-mt7621
+          git clone --depth=1 https://github.com/DragonBluep/uboot-mt7621.git uboot-mt7621
+
+      - name: Install essential packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev swig python2 python2-dev wget xz-utils
+          sudo ln -sfn "$(command -v python2)" /usr/bin/python
+          python --version
+          which python
+
+      - name: Download OpenWrt toolchain
+        run: |
+          mkdir -p toolchain
+          wget -qO - https://github.com/DragonBluep/uboot-mt7621/releases/download/20230517/openwrt-toolchain-ramips-mt7621_gcc-12.3.0_musl.Linux-x86_64.tar.xz \
+            | tar --xz -xf - -C toolchain
+
+      - name: Set old DDR timing parameters
+        if: ${{ inputs.oldparam }}
+        working-directory: uboot-mt7621
+        run: sed -i 's/0x0C000000/0x0A000000/g' ./arch/mips/mach-mt7621/dramc-legacy/dramc.S
+
+      - name: Compile
+        working-directory: uboot-mt7621
+        run: |
+          TOOLCHAIN_ROOT="${GITHUB_WORKSPACE}/toolchain/openwrt-toolchain-ramips-mt7621_gcc-12.3.0_musl.Linux-x86_64"
+          CROSS_BIN="$(find "$TOOLCHAIN_ROOT" -maxdepth 3 -type f -name 'mipsel-openwrt-linux-gcc' | head -n 1)"
+          export CROSS_COMPILE="${CROSS_BIN%gcc}"
+          export STAGING_DIR="$TOOLCHAIN_ROOT"
+          export PATH="$(dirname "$CROSS_BIN"):$PATH"
+          ./customize.sh '${{ inputs.flash }}' '${{ inputs.mtdparts }}' '${{ inputs.kernel_offset }}' '${{ inputs.reset_pin }}' \
+            '${{ inputs.sysled_pin }}' '${{ inputs.cpufreq }}' '${{ inputs.ramfreq }}' '${{ inputs.ddrparam }}' '${{ inputs.baudrate }}'
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: u-boot
+          path: |
+            uboot-mt7621/archive/
+            uboot-mt7621/u-boot-mt7621.bin
+            uboot-mt7621/u-boot.img
