@@ -1,5 +1,5 @@
 --flash NAND
---mtdparts "512k(u-boot),512k(u-boot-env),512k(factory),-(firmware)"
+--mtdparts "512k(u-boot),512k(config),512k(factory),512k(crash),-(firmware)"
 --model "JCG_Q20"
 --kernel-offset 0x180000
 --reset-pin 18
